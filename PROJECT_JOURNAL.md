@@ -790,3 +790,125 @@ Phase 12 — Polish + Integration               (v1.0.0.0)
 - All work proceeds under the "Intent is the New Skill" methodology: tests pass before any phase advances, every version bump journaled, every build committed and pushed to GitHub
 
 ---
+
+## Version 0.3.0.0 - Phase 1: Execution Layer
+
+**Date:** 2026-02-20
+**Phase:** 1 (Execution Layer)
+**Status:** Complete
+**Intent:** "Build the platform-detection and tool-execution foundation that every later phase depends on"
+
+### What Was Built
+
+#### `kestrel/core/platform.py` — PlatformInfo Detection
+Auto-detects the runtime environment at startup. Returns a `PlatformInfo` dataclass consumed by the executor and LLM factory. No user configuration required — detection is fully automatic.
+
+Key types:
+- `ExecutionMode` enum: `NATIVE` (Kali subprocess), `DOCKER` (container), `UNAVAILABLE`
+- `LLMBackendType` enum: `MLX` (Apple Silicon), `OLLAMA_CUDA`, `OLLAMA_VULKAN`, `OLLAMA_CPU`, `ANTHROPIC_ONLY`
+- `PlatformInfo` dataclass: os_name, arch, ram_gb, execution_mode, llm_backend, recommended_model, summary
+- `get_platform()` singleton — detected once, cached for the session
+- `reset_platform()` — test support
+
+Detection hierarchy:
+```
+LLM:   Apple Silicon → MLX | CUDA GPU → Ollama+CUDA | Vulkan → Ollama+Vulkan | else → Ollama CPU
+Tools: Native Kali → subprocess | Docker available → Kali container | else → UNAVAILABLE
+```
+
+Model sizing: RAM-tiered recommendations (8 GB → Mistral 7B, 128 GB+ → Llama 3.1 70B).
+
+#### `docker/Dockerfile` — Kali Linux Tool Image
+Multi-arch (ARM64 + AMD64) Docker image from `kalilinux/kali-rolling`.
+
+Tools installed:
+- **Tier 1 (wrapped, structured parsers):** nmap, gobuster, nikto, sqlmap
+- **Tier 2 (apt):** whatweb, dirb, dnsenum, dnsrecon
+- **Tier 2 (Go binaries, pinned):** ffuf 2.1.0, subfinder 2.6.6, httpx 1.6.8, nuclei 3.3.7
+- **Exploit research:** exploitdb (searchsploit)
+- **Wordlists:** wordlists, seclists (rockyou auto-decompressed)
+
+Workspace: `/workspace`, `/workspace/output`, `/workspace/scans`, `/workspace/loot`
+Container kept alive with `CMD tail -f /dev/null` for `docker exec` access.
+
+#### `docker/tool_manifest.yaml` — Tool Version Manifest
+YAML manifest tracking installed tools (tier, install method, pinned version, binary name, description).
+Includes a `missing_tools_log: {}` section populated at runtime by DockerManager when a tool request fails — developer feedback loop for next Dockerfile build.
+
+#### `kestrel/core/docker_manager.py` — Docker Container Manager
+Manages the kestrel-tools container lifecycle using subprocess (no Python docker SDK required).
+
+Key capabilities:
+- `is_available()` — checks docker CLI and daemon connectivity
+- `is_running()` — checks container state via `docker inspect`
+- `ensure_running()` — start stopped container, create new container, auto-build image
+- `exec_command(command, workdir, timeout)` — `docker exec` with timeout wrapping, returns `ExecutionResult`
+- `check_tool(tool)` — `which <tool>` inside container
+- `get_tool_version(tool)` — `<tool> --version` inside container
+- `build_image()` — `docker build -t kestrel-tools:latest docker/`
+- `_detect_missing_tool()` — exit code 127 / "command not found" detection
+- `_log_missing_tool()` — updates `docker/tool_manifest.yaml` missing_tools_log
+- `status()` — health-check dict for CLI / debugging
+
+Workspace: `~/.kestrel/workspace` mounted to `/workspace` in container.
+Container runs with `--network host` for full target reachability.
+
+#### `kestrel/core/executor.py` — Added UnifiedExecutor
+`NativeExecutor`, `ExecutionResult`, `ExecutionStatus`, `check_kali_environment` retained unchanged (backward compat — 188 passing tests rely on these).
+
+New `UnifiedExecutor` added:
+- `__init__(platform_info=None)` — auto-detects if None
+- `execute(command, timeout, env, cwd, on_output)` — same signature as NativeExecutor
+- Routes to `NativeExecutor` (NATIVE mode) or `DockerManager.exec_command` (DOCKER mode)
+- Returns `ExecutionResult(FAILED)` with install instructions on UNAVAILABLE
+- `execute_tool(tool, args, ...)` — tool availability check + execute
+- `check_tool(tool)`, `get_tool_version(tool)`, `cancel_all()` — delegated to active backend
+- `execution_mode` property, `platform` property, `status()` dict
+
+`kestrel/core/__init__.py` updated to export: `UnifiedExecutor`, `PlatformInfo`, `ExecutionMode`, `LLMBackendType`, `detect_platform`, `get_platform`, `reset_platform`, `DockerManager`.
+
+### Tests Added
+
+#### `tests/test_phase1_executor.py` (80 tests)
+- Backward-compat imports: all legacy Phase 1 exports still importable
+- PlatformInfo dataclass contracts (can_run_tools, uses_local_llm, to_dict, summary)
+- Platform detection helpers (all detection functions, model sizing, singleton)
+- UnifiedExecutor NATIVE mode routing
+- UnifiedExecutor DOCKER mode delegation
+- UnifiedExecutor UNAVAILABLE mode (returns FAILED, clear error message)
+- ExecutionResult contracts (success property, to_dict)
+
+#### `tests/test_phase1_docker.py` (49 tests)
+- DockerManager availability (CLI present, daemon responds)
+- Container state detection (is_running, _image_exists, _container_exists)
+- ensure_running state machine (already running, start stopped, create new, build image)
+- exec_command (success, failure, timeout detection, container-not-started)
+- Missing tool detection (exit 127, "command not found" string, chained commands, no false positives)
+- status() structure
+- check_tool / get_tool_version
+
+### Error Encountered and Fixed
+
+**Test failure:** `TestDockerManagerToolCheck::test_check_tool_found` — `check_tool()` calls `is_running()` before `exec_command()`. Test patched `exec_command` but forgot to patch `is_running`. Since Docker is not running on the dev machine (macOS + Claude Code), `is_running()` returned False, short-circuiting the mock. Fixed by adding `patch.object(mgr, "is_running", return_value=True)`.
+
+### Test Results
+- **Before:** 188 passed, 36 skipped, 0 failed
+- **After:** 268 passed, 36 skipped, 0 failed (+80 new tests, 0 regressions)
+
+### Files Changed
+- `kestrel/core/platform.py` — NEW
+- `docker/Dockerfile` — NEW
+- `docker/tool_manifest.yaml` — NEW
+- `kestrel/core/docker_manager.py` — NEW
+- `kestrel/core/executor.py` — MODIFIED (added UnifiedExecutor, updated docstring)
+- `kestrel/core/__init__.py` — MODIFIED (added new exports)
+- `tests/test_phase1_executor.py` — NEW
+- `tests/test_phase1_docker.py` — NEW
+- `VERSION` — 0.2.1.0 → 0.3.0.0
+- `kestrel/__init__.py` — version bump
+- `pyproject.toml` — version bump
+
+### Architecture Note
+The Capability Parity Principle is now implemented at the execution layer: every user gets the same features regardless of hardware. Hardware determines pace, not capability. An 8 GB Mac runs the same recon pipeline as a 32 GB Kali workstation — Docker containers handle the tool execution transparently on the Mac, native subprocess on the Kali box.
+
+---

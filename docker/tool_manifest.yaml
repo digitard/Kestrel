@@ -1,0 +1,138 @@
+# Kestrel Tool Manifest
+# Tracks installed tool versions in the kestrel-tools Docker image.
+# Runtime: DockerManager logs tools that are missing here so they can be
+# added to the Dockerfile in the next build.
+#
+# Format:
+#   tools:
+#     <tool_name>:
+#       tier: 1 | 2          # 1 = wrapped (structured I/O), 2 = discovered
+#       install_method: apt | binary | go
+#       version: "<pinned>"  # version string or "apt-current"
+#       binary: "<cmd>"      # actual binary name for which/shutil.which check
+#       description: "..."
+#
+# missing_tools_log: populated at runtime by DockerManager when a tool
+# is requested but not found. Review this list when planning Dockerfile updates.
+
+image:
+  name: kestrel-tools
+  base: kalilinux/kali-rolling
+  version: "1.0.0"
+  platforms:
+    - linux/amd64
+    - linux/arm64
+
+tools:
+
+  # ─── Tier 1: Wrapped tools (structured parsers built for these) ───
+
+  nmap:
+    tier: 1
+    install_method: apt
+    version: "apt-current"
+    binary: nmap
+    description: "Network mapper — port scanning, OS detection, service fingerprinting"
+
+  gobuster:
+    tier: 1
+    install_method: apt
+    version: "apt-current"
+    binary: gobuster
+    description: "Directory/file brute-forcer via wordlists"
+
+  nikto:
+    tier: 1
+    install_method: apt
+    version: "apt-current"
+    binary: nikto
+    description: "Web server vulnerability scanner"
+
+  sqlmap:
+    tier: 1
+    install_method: apt
+    version: "apt-current"
+    binary: sqlmap
+    description: "Automatic SQL injection detection and exploitation"
+
+  # ─── Tier 2: Discovery and enumeration (apt) ───
+
+  whatweb:
+    tier: 2
+    install_method: apt
+    version: "apt-current"
+    binary: whatweb
+    description: "Web application fingerprinter — identifies CMS, frameworks, plugins"
+
+  dirb:
+    tier: 2
+    install_method: apt
+    version: "apt-current"
+    binary: dirb
+    description: "Web content scanner using dictionary-based attack"
+
+  dnsenum:
+    tier: 2
+    install_method: apt
+    version: "apt-current"
+    binary: dnsenum
+    description: "DNS enumeration — subdomains, MX records, zone transfer attempts"
+
+  dnsrecon:
+    tier: 2
+    install_method: apt
+    version: "apt-current"
+    binary: dnsrecon
+    description: "DNS reconnaissance — multiple record types, brute-force subdomains"
+
+  # ─── Tier 2: Go-based tools (pinned binary releases) ───
+
+  ffuf:
+    tier: 2
+    install_method: binary
+    version: "2.1.0"
+    binary: ffuf
+    description: "Fast web fuzzer — directory, parameter, header fuzzing"
+    source: "https://github.com/ffuf/ffuf/releases"
+
+  subfinder:
+    tier: 2
+    install_method: binary
+    version: "2.6.6"
+    binary: subfinder
+    description: "Passive subdomain discovery using multiple sources"
+    source: "https://github.com/projectdiscovery/subfinder/releases"
+
+  httpx:
+    tier: 2
+    install_method: binary
+    version: "1.6.8"
+    binary: httpx
+    description: "Fast HTTP prober — status codes, titles, TLS info, response analysis"
+    source: "https://github.com/projectdiscovery/httpx/releases"
+
+  nuclei:
+    tier: 2
+    install_method: binary
+    version: "3.3.7"
+    binary: nuclei
+    description: "Template-based vulnerability scanner — thousands of community templates"
+    source: "https://github.com/projectdiscovery/nuclei/releases"
+
+  # ─── Tier 2: Exploit research ───
+
+  searchsploit:
+    tier: 2
+    install_method: apt
+    version: "apt-current"
+    binary: searchsploit
+    description: "Offline Exploit-DB search — CVE → exploit mapping"
+    package: exploitdb
+
+# ─────────────────────────────────────────────────────────────────────
+# Missing tools log
+# Populated at runtime by DockerManager._log_missing_tool()
+# Format: tool_name: "first seen YYYY-MM-DD HH:MM UTC"
+# Review this section when planning the next Dockerfile update.
+# ─────────────────────────────────────────────────────────────────────
+missing_tools_log: {}

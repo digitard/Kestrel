@@ -1,8 +1,17 @@
 """
-Kestrel Native Executor
+Kestrel Executor
 
-Executes security tools directly via subprocess on Kali Linux.
-No Docker, no containers - direct native execution.
+Provides two executors:
+
+  NativeExecutor   — Direct subprocess on Kali Linux (legacy, kept for
+                     backward compat with Phase 1 tests and tool wrappers).
+
+  UnifiedExecutor  — Platform-aware router. Auto-detects runtime environment
+                     via PlatformInfo and routes to native subprocess (Kali)
+                     or Docker (kestrel-tools container) automatically.
+
+The UnifiedExecutor is the preferred entry point for all new code. Existing
+callers of NativeExecutor continue to work unchanged.
 """
 
 import subprocess
@@ -356,7 +365,7 @@ class NativeExecutor:
 def check_kali_environment() -> dict:
     """
     Check if running on Kali Linux and verify tool availability.
-    
+
     Returns:
         Dictionary with environment check results
     """
@@ -367,7 +376,7 @@ def check_kali_environment() -> dict:
         "missing_tools": [],
         "ready": False,
     }
-    
+
     # Check OS
     try:
         with open("/etc/os-release") as f:
@@ -376,7 +385,7 @@ def check_kali_environment() -> dict:
             result["is_kali"] = "kali" in os_release.lower()
     except FileNotFoundError:
         pass
-    
+
     # Check required tools
     executor = NativeExecutor()
     required_tools = [
@@ -387,7 +396,7 @@ def check_kali_environment() -> dict:
         "curl",
         "wget",
     ]
-    
+
     for tool in required_tools:
         available = executor.check_tool(tool)
         result["tools"][tool] = {
@@ -397,12 +406,218 @@ def check_kali_environment() -> dict:
         }
         if not available:
             result["missing_tools"].append(tool)
-    
+
     # Determine readiness
     # Require at least nmap for basic functionality
     result["ready"] = (
         result["is_kali"] and
         result["tools"].get("nmap", {}).get("available", False)
     )
-    
+
     return result
+
+
+# ─────────────────────────────────────────────────────────────────────
+#  UnifiedExecutor — platform-aware router
+# ─────────────────────────────────────────────────────────────────────
+
+class UnifiedExecutor:
+    """
+    Platform-aware executor that routes commands to the correct backend.
+
+    On native Kali Linux → uses subprocess directly (NativeExecutor).
+    On all other platforms → uses the kestrel-tools Docker container.
+    If neither is available → returns FAILED results with clear error messages.
+
+    This is the preferred executor for all new code. It accepts the same
+    arguments as NativeExecutor so it is a drop-in replacement.
+
+    Usage:
+        executor = UnifiedExecutor()
+        result = executor.execute("nmap -sV target.example.com", timeout=300)
+        if result.success:
+            print(result.stdout)
+    """
+
+    def __init__(self, platform_info=None) -> None:
+        """
+        Initialise the executor.
+
+        Args:
+            platform_info: PlatformInfo instance. Auto-detected if None.
+        """
+        # Lazy import to avoid circular dependency at module level
+        from kestrel.core.platform import get_platform, ExecutionMode
+        from kestrel.core.docker_manager import DockerManager
+
+        self._platform = platform_info or get_platform()
+        self._ExecutionMode = ExecutionMode
+
+        if self._platform.execution_mode == ExecutionMode.NATIVE:
+            self._backend = NativeExecutor(
+                working_dir=Path("/workspace") if Path("/workspace").exists() else Path.home()
+            )
+            self._docker: Optional["DockerManager"] = None
+        elif self._platform.execution_mode == ExecutionMode.DOCKER:
+            self._backend = None
+            self._docker = DockerManager()
+        else:
+            self._backend = None
+            self._docker = None
+
+    # ─── Core execution ───────────────────────────────────────────────
+
+    def execute(
+        self,
+        command: str,
+        timeout: Optional[int] = None,
+        env: Optional[dict] = None,
+        cwd: Optional[Path] = None,
+        on_output: Optional[Callable[[str], None]] = None,
+    ) -> ExecutionResult:
+        """
+        Execute a command on the appropriate backend.
+
+        Args:
+            command:   Shell command string to run.
+            timeout:   Timeout in seconds (None = no limit).
+            env:       Extra environment variables (native only; Docker ignores).
+            cwd:       Working directory override (native: local path;
+                       Docker: path inside container, defaults to /workspace).
+            on_output: Streaming output callback (native only; Docker buffers).
+
+        Returns:
+            ExecutionResult with stdout, stderr, status, and timing.
+        """
+        from kestrel.core.platform import ExecutionMode
+
+        mode = self._platform.execution_mode
+
+        if mode == ExecutionMode.NATIVE:
+            return self._backend.execute(
+                command=command,
+                timeout=timeout,
+                env=env,
+                cwd=cwd,
+                on_output=on_output,
+            )
+
+        if mode == ExecutionMode.DOCKER:
+            workdir = str(cwd) if cwd else "/workspace"
+            return self._docker.exec_command(
+                command=command,
+                workdir=workdir,
+                timeout=timeout,
+            )
+
+        # ExecutionMode.UNAVAILABLE
+        started_at = datetime.now()
+        return ExecutionResult(
+            command=command,
+            status=ExecutionStatus.FAILED,
+            error_message=(
+                "No tool execution environment available. "
+                "Install Docker (https://docs.docker.com/get-docker/) "
+                "or run Kestrel on native Kali Linux."
+            ),
+            started_at=started_at,
+            completed_at=started_at,
+            duration_seconds=0.0,
+        )
+
+    def execute_tool(
+        self,
+        tool: str,
+        args: list[str],
+        timeout: Optional[int] = None,
+        env: Optional[dict] = None,
+        cwd: Optional[Path] = None,
+        on_output: Optional[Callable[[str], None]] = None,
+    ) -> ExecutionResult:
+        """
+        Execute a specific tool with arguments.
+
+        Checks tool availability before executing. Returns a FAILED result
+        if the tool is not found rather than raising an exception.
+
+        Args:
+            tool:      Tool binary name (e.g. "nmap").
+            args:      Argument list.
+            timeout:   Timeout in seconds.
+            env:       Extra environment variables.
+            cwd:       Working directory.
+            on_output: Streaming callback.
+
+        Returns:
+            ExecutionResult
+        """
+        if not self.check_tool(tool):
+            started_at = datetime.now()
+            return ExecutionResult(
+                command=f"{tool} {' '.join(args)}",
+                status=ExecutionStatus.FAILED,
+                error_message=f"Tool not found: {tool}",
+                started_at=started_at,
+                completed_at=started_at,
+                duration_seconds=0.0,
+            )
+
+        command = f"{tool} {' '.join(str(a) for a in args)}"
+        return self.execute(
+            command=command,
+            timeout=timeout,
+            env=env,
+            cwd=cwd,
+            on_output=on_output,
+        )
+
+    # ─── Tool inspection ──────────────────────────────────────────────
+
+    def check_tool(self, tool: str) -> bool:
+        """True if `tool` is available on the active backend."""
+        from kestrel.core.platform import ExecutionMode
+        if self._platform.execution_mode == ExecutionMode.NATIVE:
+            return self._backend.check_tool(tool)
+        if self._platform.execution_mode == ExecutionMode.DOCKER:
+            return self._docker.check_tool(tool)
+        return False
+
+    def get_tool_version(self, tool: str) -> Optional[str]:
+        """Return version string for `tool` on the active backend, or None."""
+        from kestrel.core.platform import ExecutionMode
+        if self._platform.execution_mode == ExecutionMode.NATIVE:
+            return self._backend.get_tool_version(tool)
+        if self._platform.execution_mode == ExecutionMode.DOCKER:
+            return self._docker.get_tool_version(tool)
+        return None
+
+    def cancel_all(self) -> int:
+        """Cancel all running processes (native mode only; no-op for Docker)."""
+        from kestrel.core.platform import ExecutionMode
+        if self._platform.execution_mode == ExecutionMode.NATIVE:
+            return self._backend.cancel_all()
+        return 0
+
+    # ─── Introspection ────────────────────────────────────────────────
+
+    @property
+    def execution_mode(self) -> str:
+        """Current execution mode value string ('native', 'docker', 'unavailable')."""
+        return self._platform.execution_mode.value
+
+    @property
+    def platform(self):
+        """The PlatformInfo this executor was configured for."""
+        return self._platform
+
+    def status(self) -> dict:
+        """Return a status summary for health checks and debugging."""
+        from kestrel.core.platform import ExecutionMode
+        base = {
+            "execution_mode": self._platform.execution_mode.value,
+            "llm_backend": self._platform.llm_backend.value,
+            "platform_summary": self._platform.summary,
+        }
+        if self._platform.execution_mode == ExecutionMode.DOCKER and self._docker:
+            base["docker"] = self._docker.status()
+        return base
