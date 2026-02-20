@@ -1,0 +1,41 @@
+# Secrets — never commit
+credentials.yaml
+credentials.yml
+*.key
+*.secret
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+.pytest_cache/
+*.pyc
+htmlcov/
+.coverage
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project runtime
+*.log
+sessions/
+workspace/
+kestrel_v*.zip
+
+# Kestrel credential dir (local machine only)
+~/.kestrel/

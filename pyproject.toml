@@ -1,0 +1,151 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kestrel"
+version = "0.2.0.1"
+description = "LLM-assisted bug bounty hunting platform for Kali Linux"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [
+    {name = "Kestrel Team"}
+]
+keywords = ["security", "bug-bounty", "penetration-testing", "llm", "automation"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+
+dependencies = [
+    # Core
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+    
+    # HTTP/API clients
+    "requests>=2.31",
+    "httpx>=0.25",
+    "aiohttp>=3.9",
+    
+    # LLM
+    "anthropic>=0.18",
+    
+    # Web Framework
+    "fastapi>=0.109",
+    "uvicorn[standard]>=0.27",
+    "python-multipart>=0.0.6",
+    "websockets>=12.0",
+    "jinja2>=3.1",
+    
+    # Database
+    "sqlalchemy>=2.0",
+    "aiosqlite>=0.19",
+    
+    # CLI
+    "click>=8.1",
+    "rich>=13.0",
+    
+    # Utilities
+    "python-dateutil>=2.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "pytest-httpx>=0.28",
+    "black>=24.0",
+    "ruff>=0.1",
+    "mypy>=1.8",
+]
+
+[project.scripts]
+kestrel = "kestrel.cli:main"
+bh = "kestrel.cli:main"
+
+[project.urls]
+Documentation = "https://github.com/example/kestrel#readme"
+Source = "https://github.com/example/kestrel"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["kestrel*"]
+
+[tool.setuptools.package-data]
+kestrel = [
+    "web/templates/**/*.html",
+    "web/static/**/*",
+    "config/*.yaml",
+]
+
+# ============================================================================
+# Tool Configuration
+# ============================================================================
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+[tool.coverage.run]
+source = ["kestrel"]
+branch = true
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+include = '\.pyi?$'
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # Pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+    "B008",  # do not perform function calls in argument defaults
+]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true
+ignore_missing_imports = true

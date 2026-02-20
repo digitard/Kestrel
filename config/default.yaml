@@ -1,0 +1,199 @@
+# Kestrel Default Configuration
+# Copy to ~/.config/kestrel/config.yaml to customize
+
+# ============================================================================
+# Application Settings
+# ============================================================================
+app:
+  name: "Kestrel"
+  version: "0.0.0.1"
+  debug: false
+  log_level: "INFO"
+
+# ============================================================================
+# Web Server
+# ============================================================================
+server:
+  host: "127.0.0.1"
+  port: 8080
+  reload: false  # Enable for development
+
+# ============================================================================
+# Database
+# ============================================================================
+database:
+  # SQLite database location
+  path: "~/.local/share/kestrel/kestrel.db"
+  
+  # How long to cache program data (seconds)
+  program_cache_ttl: 86400  # 24 hours
+
+# ============================================================================
+# Platform Credentials
+# Use environment variables for security:
+#   HACKERONE_API_KEY, HACKERONE_USERNAME
+#   BUGCROWD_API_KEY
+# ============================================================================
+platforms:
+  hackerone:
+    enabled: true
+    api_url: "https://api.hackerone.com/v1"
+    # Credentials loaded from environment variables
+    
+  bugcrowd:
+    enabled: true
+    api_url: "https://api.bugcrowd.com"
+    # Credentials loaded from environment variables
+
+# ============================================================================
+# LLM Configuration
+# Use environment variable: ANTHROPIC_API_KEY
+# ============================================================================
+llm:
+  provider: "anthropic"
+  model: "claude-sonnet-4-20250514"
+  max_tokens: 4096
+  temperature: 0.0  # Deterministic for security tools
+  
+  # Token budgets per operation
+  budgets:
+    translation: 500
+    analysis: 2000
+    exploit_planning: 3000
+    report_generation: 4000
+
+# ============================================================================
+# CVE Correlation
+# ============================================================================
+cve:
+  # NVD API (optional key for higher rate limits)
+  # Use environment variable: NVD_API_KEY
+  nvd:
+    enabled: true
+    api_url: "https://services.nvd.nist.gov/rest/json/cves/2.0"
+    rate_limit: 5  # requests per 30 seconds without key
+    
+  # Exploit-DB
+  exploitdb:
+    enabled: true
+    # Uses local searchsploit when available
+    
+  # Cache duration for CVE data
+  cache_ttl: 86400  # 24 hours
+
+# ============================================================================
+# Hunting Settings
+# ============================================================================
+hunting:
+  # Maximum concurrent hunts
+  max_concurrent_hunts: 1
+  
+  # Maximum exploit attempts per hunt
+  max_exploits_per_hunt: 5
+  
+  # Auto-suggest next actions
+  auto_suggest: true
+  
+  # Timeouts (seconds)
+  timeouts:
+    nmap_quick: 120
+    nmap_full: 600
+    gobuster: 300
+    nikto: 300
+    sqlmap: 600
+    nuclei: 300
+    default: 300
+
+# ============================================================================
+# Scope Validation (CRITICAL SAFETY SETTINGS)
+# ============================================================================
+scope:
+  # Always re-validate scope before execution
+  revalidate_before_exec: true
+  
+  # Fail closed on any scope validation error
+  fail_closed: true
+  
+  # Rate limit buffer (multiply program limits by this)
+  rate_limit_buffer: 1.5
+  
+  # Block these patterns even if "in scope"
+  global_blocklist:
+    - "*.gov"
+    - "*.mil"
+    - "*.edu"
+    - "localhost"
+    - "127.0.0.1"
+    - "10.*"
+    - "172.16.*"
+    - "192.168.*"
+
+# ============================================================================
+# Authorization Gate (CRITICAL SAFETY SETTINGS)
+# ============================================================================
+authorization:
+  # NEVER set to false
+  require_authorization: true
+  
+  # Show full command details before authorization
+  show_commands: true
+  
+  # Allow per-step authorization (vs all-or-nothing)
+  allow_step_authorization: true
+  
+  # Timeout for authorization prompt (seconds, 0 = no timeout)
+  prompt_timeout: 0
+
+# ============================================================================
+# Audit Logging
+# ============================================================================
+audit:
+  enabled: true
+  path: "~/.local/share/kestrel/audit/"
+  
+  # Keep audit logs for this many days
+  retention_days: 90
+  
+  # Log these events
+  log_events:
+    - authorization_request
+    - authorization_granted
+    - authorization_denied
+    - exploit_executed
+    - scope_validation
+    - finding_discovered
+
+# ============================================================================
+# Reports
+# ============================================================================
+reports:
+  output_dir: "~/.local/share/kestrel/reports/"
+  
+  # Include these sections by default
+  default_sections:
+    - summary
+    - severity
+    - reproduction_steps
+    - impact
+    - evidence
+    - remediation
+    
+  # Auto-open report after generation
+  auto_open: true
+
+# ============================================================================
+# Evidence Collection
+# ============================================================================
+evidence:
+  output_dir: "~/.local/share/kestrel/evidence/"
+  
+  # Screenshot settings (if gowitness available)
+  screenshots:
+    enabled: true
+    timeout: 30
+    
+  # Save raw tool output
+  save_raw_output: true
+  
+  # Save HTTP request/response pairs
+  save_http_traffic: true
