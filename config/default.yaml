@@ -50,12 +50,39 @@ platforms:
 # Use environment variable: ANTHROPIC_API_KEY
 # ============================================================================
 llm:
+  # Mode: "hybrid" (recommended), "api" (cloud only), "local" (no API calls)
+  mode: "hybrid"
+
+  # Legacy provider setting (kept for backward compat)
   provider: "anthropic"
-  model: "claude-sonnet-4-20250514"
-  max_tokens: 4096
-  temperature: 0.0  # Deterministic for security tools
-  
-  # Token budgets per operation
+
+  # Cloud API backend (Anthropic)
+  api:
+    model: "claude-sonnet-4-6"
+    max_tokens: 8192
+    temperature: 0.1
+
+  # Local backend (MLX on Apple Silicon, Ollama everywhere else)
+  local:
+    # "auto" selects MLX on Apple Silicon, Ollama on all other platforms
+    backend: "auto"
+    # Model is auto-selected by PlatformInfo based on detected RAM.
+    # Override here if you want a specific model:
+    # model: "qwen3:8b"
+    context_length: 4096
+    ollama_host: "http://localhost:11434"
+
+  # Hybrid router — complexity-based routing
+  hybrid:
+    # True = fall back to local if API call fails
+    fallback_to_local: true
+    # False = do not fall back to API if local fails (local = local)
+    fallback_to_api: false
+    # Keyword overrides (empty = use built-in defaults)
+    simple_keywords: []
+    complex_keywords: []
+
+  # Legacy token budgets per operation
   budgets:
     translation: 500
     analysis: 2000

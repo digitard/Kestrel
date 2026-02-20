@@ -995,3 +995,103 @@ Removed stale BountyHunter-era content before it became harder to trace:
 - `VERSION` / `kestrel/__init__.py` / `pyproject.toml` — 0.3.0.2 → 0.3.0.3
 
 ---
+
+## Version 0.4.0.0 - Phase 2: LLM Abstraction Layer
+
+**Date:** 2026-02-20
+**Phase:** 2 (LLM Abstraction Layer)
+**Status:** Complete
+
+### What Was Done
+
+Ported and adapted CTFRunner's full LLM stack into Kestrel. The abstraction
+layer enables platform-aware backend selection, complexity-based routing, and
+context window management — all without touching the orchestrator or tools.
+
+**New files in `kestrel/llm/`:**
+- **`backend.py`** — `LLMBackend` Protocol, `Message` and `LLMResponse` dataclasses.
+  The orchestrator will depend only on this interface, never on a specific backend.
+- **`context_trimmer.py`** — Token budget trimmer. Char-based heuristic (1 token ≈ 4 chars).
+  Keeps first message (hunt context) + most recent tail; drops middle messages when over budget.
+- **`anthropic_backend.py`** — Cloud API backend for complex tasks (CVE correlation,
+  exploit planning, report generation). Resolves key from env var → `~/.kestrel/credentials.yaml`.
+  Includes per-model pricing table for cost estimation.
+- **`mlx_backend.py`** — Apple Silicon local inference via MLX. Lazy-loads model on first use.
+  Uses `PlatformInfo.recommended_model` for hardware-appropriate model selection.
+- **`ollama_backend.py`** — Ollama backend for all non-Apple-Silicon platforms (CUDA/Vulkan/CPU).
+  Speaks the Ollama `/api/chat` REST API; no external SDK dependency.
+- **`hybrid_router.py`** — Complexity classifier + router. Routes simple recon tasks (banner
+  parsing, port summary) to local; complex tasks (CVE correlation, exploit planning,
+  report generation) to Anthropic API. Three-stage classification: keyword scan →
+  LLM fallback → cache. Safe default: ambiguous = complex.
+- **`backend_factory.py`** — Platform-aware factory. Uses `PlatformInfo.llm_backend`
+  (detected at startup by `kestrel.core.platform`) to select MLX vs Ollama vs Anthropic.
+  Supports modes: `"api"`, `"local"`, `"hybrid"` (default), `"auto"`.
+
+**Updated files in `kestrel/llm/`:**
+- **`prompts.py`** — Added `BUG_BOUNTY_SYSTEM_PROMPT` — bug-bounty-specific system prompt
+  used by all backends. Covers: authorization gate, CVE correlation, exploit planning,
+  report format, scope awareness, and command execution via `<cmd>` tags.
+- **`__init__.py`** — Re-exported all new types. Legacy exports (`AnthropicClient`,
+  builder functions) kept for Phase 1 test backward compatibility.
+
+**Updated `config/default.yaml`:**
+- Added `llm.mode` (`"hybrid"` default)
+- Added `llm.api` (model, max_tokens, temperature for cloud backend)
+- Added `llm.local` (backend auto-select, context_length, ollama_host)
+- Added `llm.hybrid` (fallback flags, keyword overrides)
+
+**New test file:**
+- **`tests/test_llm/test_phase2_llm.py`** — 72 tests covering all new modules:
+  Message/LLMResponse dataclasses, context trimmer (all edge cases), HybridRouter
+  (keyword routing, LLM fallback, fallback-on-error, no-fallback-raises),
+  BackendFactory (all modes + platform routing), AnthropicBackend pricing,
+  OllamaBackend message building, and module import smoke tests.
+
+### Key Design Decisions
+
+1. **PlatformInfo drives local backend selection** — `backend_factory.py` reads
+   `PlatformInfo.llm_backend` (LLMBackendType enum) rather than re-detecting
+   Apple Silicon inline. Single source of truth.
+
+2. **Complex keywords take priority over simple** — In HybridRouter, if a prompt
+   matches both keyword sets, complex wins. Safety-first: use the more capable
+   backend when in doubt.
+
+3. **Module-level import for patchability** — `get_platform` is imported at the
+   top of `mlx_backend.py` and `ollama_backend.py` (not inside `__init__`) so
+   tests can patch it with `unittest.mock.patch`.
+
+4. **No external tokenizer** — Context trimmer uses char-based heuristic
+   (1 token ≈ 4 chars) to avoid mlx-lm/tiktoken as a hard dependency for trimming.
+
+5. **Old `anthropic.py` retained** — Phase 1 tests still import `AnthropicClient`.
+   Will be removed cleanly when Phase 6 (Hunt Orchestrator) replaces all call sites.
+
+### Errors Encountered and Fixed
+
+1. **`get_platform` not patchable** — Initially imported inside `__init__` method.
+   Fixed by moving to module-level import.
+2. **`asyncio.get_event_loop()` deprecated in Python 3.14** — Replaced all
+   `asyncio.get_event_loop().run_until_complete(...)` with `asyncio.run(...)`.
+
+### Test Results
+- **Before:** 268 passed, 36 skipped, 0 failed
+- **After:** 340 passed, 36 skipped, 0 failed (+72 new tests, 0 regressions)
+
+### Files Changed
+- `kestrel/llm/backend.py` — NEW
+- `kestrel/llm/context_trimmer.py` — NEW
+- `kestrel/llm/anthropic_backend.py` — NEW
+- `kestrel/llm/mlx_backend.py` — NEW
+- `kestrel/llm/ollama_backend.py` — NEW
+- `kestrel/llm/hybrid_router.py` — NEW
+- `kestrel/llm/backend_factory.py` — NEW
+- `kestrel/llm/prompts.py` — MODIFIED (added BUG_BOUNTY_SYSTEM_PROMPT)
+- `kestrel/llm/__init__.py` — MODIFIED (new exports + legacy compat)
+- `config/default.yaml` — MODIFIED (llm.mode/api/local/hybrid sections)
+- `tests/test_llm/__init__.py` — NEW (empty, makes directory a package)
+- `tests/test_llm/test_phase2_llm.py` — NEW (72 tests)
+- `VERSION` / `kestrel/__init__.py` / `pyproject.toml` — 0.3.0.3 → 0.4.0.0
+
+---

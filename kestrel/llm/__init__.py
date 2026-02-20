@@ -17,12 +17,33 @@
 """
 Kestrel LLM Integration
 
-Provides LLM-assisted capabilities for hunting.
+Phase 2 — LLM Abstraction Layer.
+
+New (Phase 2):
+  backend.py          — LLMBackend Protocol, Message, LLMResponse dataclasses
+  backend_factory.py  — Platform-aware factory (MLX / Ollama / Anthropic)
+  hybrid_router.py    — Complexity-based routing (simple→local, complex→API)
+  mlx_backend.py      — Apple Silicon local inference
+  ollama_backend.py   — All other platforms (CUDA / Vulkan / CPU)
+  anthropic_backend.py — Cloud API backend for complex tasks
+  context_trimmer.py  — Token budget management for long sessions
+  prompts.py          — BUG_BOUNTY_SYSTEM_PROMPT + builder functions
+
+Legacy (Phase 1, kept for test compatibility):
+  anthropic.py        — AnthropicClient (thin wrapper, replaced by anthropic_backend.py)
 """
 
+# Phase 2 — new abstractions
+from .backend import LLMBackend, Message, LLMResponse
+from .backend_factory import create_backend
+from .hybrid_router import HybridRouter
+from .context_trimmer import trim_context, estimate_messages_tokens
+from .prompts import BUG_BOUNTY_SYSTEM_PROMPT
+
+# Legacy — Phase 1 compatibility (anthropic.py / prompts.py old functions)
 from .anthropic import (
     AnthropicClient,
-    LLMResponse,
+    LLMResponse as _LegacyLLMResponse,  # kept for old test imports
     get_llm_client,
     reset_llm_client,
 )
@@ -36,8 +57,17 @@ from .prompts import (
 
 
 __all__ = [
-    "AnthropicClient",
+    # Phase 2
+    "LLMBackend",
+    "Message",
     "LLMResponse",
+    "create_backend",
+    "HybridRouter",
+    "trim_context",
+    "estimate_messages_tokens",
+    "BUG_BOUNTY_SYSTEM_PROMPT",
+    # Legacy
+    "AnthropicClient",
     "get_llm_client",
     "reset_llm_client",
     "build_translation_prompt",
