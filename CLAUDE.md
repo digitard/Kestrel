@@ -251,40 +251,40 @@ Key credentials:
 
 | Phase | Description | Status | Version |
 |-------|-------------|--------|---------|
-| Phase 0 | Project Scaffold | ✅ Complete | 0.0.0.2 |
-| Phase 1 | Core Foundation | ✅ Complete | 0.1.0.0 |
-| Phase 1.1 | Tool Registry | ✅ Complete | 0.1.1.0 |
-| Phase 2 | Platform Integration | ✅ Complete | 0.2.0.1 |
-| **Phase 2.1** | **Architecture Pivot + Rename** | **✅ Complete** | **0.2.1.0** |
-| **Phase 3** | **LLM Layer + CVE Correlation** | **⬜ NEXT** | **0.3.x.x** |
-| Phase 4 | Hunt Orchestrator | ⬜ | 0.4.x.x |
-| Phase 5 | Authorization Gate | ⬜ | 0.5.x.x |
-| Phase 6 | Exploit Execution Loop | ⬜ | 0.6.x.x |
-| Phase 7 | Web API | ⬜ | 0.7.x.x |
-| Phase 8 | Web UI | ⬜ | 0.8.x.x |
-| Phase 9 | Report Generation + Submission | ⬜ | 0.9.x.x |
-| Phase 10 | Polish & Integration | ⬜ | 1.0.x.x |
+| Phase 0 | Scaffold + Platform Detection (all prior work) | ✅ Complete | 0.0.x.x – 0.2.1.0 |
+| **Phase 1** | **Execution Layer** | **⬜ NEXT** | **0.3.x.x** |
+| Phase 2 | LLM Abstraction Layer | ⬜ | 0.4.x.x |
+| Phase 3 | Tool Layer | ⬜ | 0.5.x.x |
+| Phase 4 | Platform Integration | ⬜ | 0.6.x.x |
+| Phase 5 | CVE + Knowledge Layer | ⬜ | 0.7.x.x |
+| Phase 6 | Hunt Orchestrator | ⬜ | 0.8.x.x |
+| Phase 7 | Authorization Gate | ⬜ | 0.9.x.x |
+| Phase 8 | Exploit Execution Loop | ⬜ | 0.10.x.x |
+| Phase 9 | Web API | ⬜ | 0.11.x.x |
+| Phase 10 | Web UI | ⬜ | 0.12.x.x |
+| Phase 11 | Report Generation + Submission | ⬜ | 0.13.x.x |
+| Phase 12 | Polish + Integration | ⬜ | 1.0.0.0 |
 
-### Phase 3: LLM Layer + CVE Correlation (NEXT)
+> **Note on version numbering:** After the architectural reset at v0.2.1.0, the BB segment no longer maps 1:1 to phase numbers. PROJECT_JOURNAL.md is the authoritative record. PROJECT_DOCUMENTATION.md has full phase specs.
 
-**Goal:** Replace thin LLM client with the full CTFRunner-pattern abstraction layer AND build CVE correlation on top of it.
+### Phase 1: Execution Layer (NEXT — v0.3.x.x)
+
+**Goal:** Build the unified execution abstraction that everything else depends on. Docker image (ARM64 + AMD64) + native Kali detection + bypass logic + unified executor interface.
 
 **Deliverables:**
-- Port CTFRunner `LLMBackend` Protocol, `HybridRouter`, `BackendFactory`, `MLXBackend`, `OllamaBackend`
-- NVD API client (query CVEs by product/version)
-- Exploit-DB search integration
-- Fingerprint extraction from scan results
-- LLM-assisted CVE matching via HybridRouter
-- Knowledge store (SQLite + FAISS) for CVE + technique data
-- Exploitability scoring
+- `kestrel/core/platform.py` — PlatformInfo detection (Apple Silicon, CUDA, Vulkan, Kali, Docker)
+- `docker/Dockerfile` — Kali-based multi-arch image with pinned tools
+- `docker/tool_manifest.yaml` — Pinned versions + missing tool log
+- `kestrel/core/executor.py` — Rebuilt: native subprocess OR Docker exec, identical interface
+- `kestrel/core/docker_manager.py` — Container lifecycle management
 
 **Success Criteria:**
-- Platform detection works correctly (MLX on Apple Silicon, Ollama elsewhere)
-- HybridRouter correctly routes simple/complex tasks
-- Can query CVEs by product/version
-- LLM correlates findings to CVEs intelligently
-- Knowledge store persists and retrieves technique data
-- All unit tests pass, 188+ baseline maintained
+- Platform detection correctly identifies all target environments
+- Docker image builds for ARM64 and AMD64
+- nmap runs correctly via Docker on Mac
+- nmap runs correctly natively on Kali
+- Same wrapper code works for both — executors are transparent
+- 188 existing tests still pass + all new tests pass
 
 ---
 

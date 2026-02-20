@@ -638,3 +638,155 @@ Tool execution auto-detection:
 - Add Docker executor mode to NativeExecutor with Kali detection bypass
 
 ---
+
+## Architectural Reset Decision — Foundation Rebuild
+
+**Date:** 2026-02-20
+**Type:** Strategic Decision (no version bump — pre-build planning entry)
+**Status:** Decision Made — Rebuild begins at v0.3.0.0
+**Model:** Claude Sonnet 4.6 (Claude Code)
+
+### The Decision
+
+After reviewing the full phase plan against the new platform-agnostic architecture, the decision was made to **perform a foundational rebuild of Kestrel rather than continue building on the existing phase structure.**
+
+This is not a rewrite from scratch. It is a surgical restructuring: the existing codebase is reviewed, platform-agnostic components are migrated into a clean new foundation, and components built on the wrong assumptions (Kali-native-only) are rebuilt correctly from the start.
+
+### Why This Decision Was Made
+
+**Intent from operator:**
+> "Foundation is everything. It's better to take the regression in phases now due to our shifted focus and the important ingestion of supporting code from CTFRunner where we can cleanly build out and test, versus the problems likely if we start to build into it without a proper foundation."
+
+This is the correct call. The original phase structure was designed around "Kali native only, no Docker" — a mandate that has since been fully reversed. Several foundational components were built under that wrong assumption:
+
+1. **`core/executor.py` (NativeExecutor)** — Built assuming always-native subprocess on Kali. The new architecture requires a unified execution abstraction that detects native Kali vs Docker at runtime and routes accordingly. Retrofitting this after other phases are built on top of it is guaranteed to be messier than rebuilding it as the true foundation it is.
+
+2. **`kestrel/llm/`** — The existing LLM layer is a thin placeholder (single Anthropic client, basic prompts). The new design calls for the full CTFRunner abstraction pattern: `LLMBackend` Protocol, `HybridRouter`, `BackendFactory` with platform detection, `MLXBackend`, `OllamaBackend`. This is not an extension of the existing code — it replaces it entirely, and it should be Phase 2 of the new structure, not Phase 3.
+
+3. **Docker infrastructure** — Entirely absent from the current codebase. Under the new architecture, this is foundational. The Kali Docker image (ARM64 + AMD64 multi-arch), tool manifest, and container execution layer need to exist before tool wrappers and the ToolRegistry can be properly validated on non-Kali platforms. This belongs in Phase 1.
+
+4. **Phase ordering** — The original phase plan treated the execution layer and LLM layer as subordinate components. They are actually the foundation everything else depends on. Getting the ordering wrong and building on top of it compounds technical debt with every subsequent phase.
+
+### What Is Being Preserved
+
+The rebuild does not discard all existing work. The following components were built correctly and are platform-agnostic by design — they migrate cleanly into the new structure:
+
+| Component | Status | Notes |
+|---|---|---|
+| `platforms/hackerone.py` | ✅ Migrate | Pure API client, no execution assumptions |
+| `platforms/bugcrowd.py` | ✅ Migrate | Pure API client, no execution assumptions |
+| `platforms/models.py` | ✅ Migrate | Data models (Program, ScopeEntry, ScopeValidator) |
+| `platforms/cache.py` | ✅ Migrate | SQLite cache, fully platform-agnostic |
+| `platforms/credentials.py` | ✅ Migrate | CredentialManager, already updated for new credential set |
+| `platforms/base.py` | ✅ Migrate | BasePlatformClient, RateLimiter, error hierarchy |
+| `parsers/` (all) | ✅ Migrate | Pure Python parsing, zero execution assumptions |
+| `core/config.py` | ✅ Migrate | Config system, needs new keys for Docker/LLM |
+| `core/session.py` | ✅ Migrate | Session state machine, platform-agnostic |
+| `tools/base.py` | ✅ Migrate | Tool wrapper base class, needs new executor underneath |
+| Tool wrappers (nmap, gobuster, nikto, sqlmap) | ✅ Migrate | Wrapper logic is sound, needs working executor |
+| Test suite (188 passing, 36 skipped) | ✅ Migrate | Tests against platform-agnostic components survive |
+
+| Component | Status | Notes |
+|---|---|---|
+| `core/executor.py` | ❌ Rebuild | Assumes Kali-native subprocess only |
+| `kestrel/llm/` (all) | ❌ Rebuild | Replace with CTFRunner pattern entirely |
+| `tools/registry.py` | ⚠️ Rebuild | Discovery logic needs Docker-aware executor underneath |
+| Docker layer | ❌ Build new | Does not exist — foundational Phase 1 deliverable |
+| `kestrel/knowledge/` | ❌ Build new | Does not exist — Phase 5 deliverable |
+
+### CTFRunner: Sister Project in the Same Methodology
+
+CTFRunner is a separate project in the "Intent is the New Skill" series — an AI-powered Capture The Flag assistant built using the same methodology as Kestrel: human provides intent, AI writes all code, every phase tested before advancing, no hands-on coding by the operator.
+
+CTFRunner and Kestrel share significant overlapping architectural needs:
+- Both require a hybrid LLM layer (local for cheap tasks, cloud API for complex reasoning)
+- Both run an agent loop (Plan/Execute/Observe/Reason)
+- Both need a knowledge store for technique recall (SQLite + FAISS)
+- Both run security tools and need to handle output parsing
+
+Rather than rebuild these components from scratch in Kestrel, the decision was made to port the proven, tested implementations directly from CTFRunner. This is not code sharing in a dependency sense — CTFRunner is read-only reference material. The components are ported (adapted, renamed, extended for bug bounty context) into Kestrel's own codebase.
+
+CTFRunner components being ported:
+- `llm/backend.py` → `LLMBackend` Protocol + `Message`/`LLMResponse` dataclasses
+- `llm/hybrid_router.py` → `HybridRouter` (classify simple/complex, route to local/API)
+- `llm/backend_factory.py` → `BackendFactory` (auto-detect MLX/Ollama/Anthropic)
+- `llm/mlx_backend.py` → `MLXBackend` (Apple Silicon inference)
+- `llm/ollama_backend.py` → `OllamaBackend` (all other platforms)
+- `core/orchestrator.py` → Hunt orchestrator loop pattern (adapted for bug bounty context)
+- `knowledge/store.py` + `knowledge/technique_library.py` → CVE/technique knowledge base
+
+### New Phase Structure
+
+The phase plan is restructured to reflect correct foundational ordering. Version numbers continue forward from 0.2.1.0 — the BB segment no longer maps 1:1 to phase numbers after the reset, and that is intentional. The journal is the source of truth for what each version represents.
+
+```
+Phase 0  — Scaffold + Platform Detection      (complete: v0.0.x.x–v0.2.1.0)
+Phase 1  — Execution Layer                    (v0.3.x.x) ← START HERE
+           Docker image (ARM64 + AMD64 Kali)
+           Native Kali detection + bypass
+           Unified executor abstraction
+           Tool manifest + missing tool logging
+
+Phase 2  — LLM Abstraction Layer              (v0.4.x.x)
+           Port from CTFRunner: Backend Protocol, HybridRouter,
+           BackendFactory, MLXBackend, OllamaBackend
+
+Phase 3  — Tool Layer                         (v0.5.x.x)
+           Migrate tool wrappers + parsers onto new executor
+           ToolRegistry with Docker-aware discovery
+
+Phase 4  — Platform Integration               (v0.6.x.x)
+           Migrate H1, Bugcrowd, ScopeValidator, cache, credentials
+           Add IntiGriti, YesWeHack stubs for future expansion
+
+Phase 5  — CVE + Knowledge Layer              (v0.7.x.x)
+           NVD API client
+           Exploit-DB / searchsploit integration
+           Shodan/Censys passive recon
+           SQLite + FAISS knowledge store (port from CTFRunner)
+           LLM-assisted CVE matching + exploitability scoring
+
+Phase 6  — Hunt Orchestrator                  (v0.8.x.x)
+           Plan/Execute/Observe/Reason loop (port from CTFRunner)
+           Multi-target persistent sessions
+           Finding aggregation + evidence capture
+
+Phase 7  — Authorization Gate                 (v0.9.x.x)
+           Exploit plan display
+           Human approval workflow (CLI first, UI later)
+           Audit logging of all decisions
+
+Phase 8  — Exploit Execution Loop             (v0.10.x.x)
+           Autonomous rabbit-hole following
+           Post-exploit tracking (shell/creds/root/lateral)
+           Scope re-validation at every step
+
+Phase 9  — Web API                            (v0.11.x.x)
+           FastAPI + WebSocket
+           Real-time hunt progress streaming
+
+Phase 10 — Web UI                             (v0.12.x.x)
+           Program browser + hunt management
+           Authorization modal
+           Real-time hunt display
+
+Phase 11 — Report Generation + Submission     (v0.13.x.x)
+           H1/Bugcrowd formatted reports
+           Evidence packaging
+           API submission
+
+Phase 12 — Polish + Integration               (v1.0.0.0)
+           Edge case hardening, demo prep, docs complete
+```
+
+### Tests at Decision Point
+- 188 passed, 36 skipped, 0 failed
+- All passing tests are against platform-agnostic components — they migrate with the rebuild
+
+### What Happens Next
+- `PROJECT_DOCUMENTATION.md` rewritten with new architecture and phase structure
+- `CLAUDE.md` updated to reflect new phase numbering and foundation-first ordering
+- Phase 1 (Execution Layer) begins at v0.3.0.0
+- All work proceeds under the "Intent is the New Skill" methodology: tests pass before any phase advances, every version bump journaled, every build committed and pushed to GitHub
+
+---
