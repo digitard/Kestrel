@@ -1,5 +1,14 @@
 # Kestrel
 
+```
+██   ██ ███████  ██████   █████ ██████  ███████ ██
+██  ██  ██      ██         ██    ██   ██ ██      ██
+█████   █████    █████     ██    ██████  █████   ██
+██  ██  ██           ██    ██    ██   ██ ██      ██
+██   ██ ███████ ██████     ██    ██   ██ ███████ ███████
+                                    OTS - Own the System
+```
+
 **LLM-Assisted Bug Bounty Hunting Platform for Kali Linux**
 
 > ⚠️ **This tool is for authorized bug bounty hunting only.** Only use on programs where you have explicit permission.
@@ -66,7 +75,7 @@ Kestrel enforces multiple safety measures:
 
 ## Development Status
 
-**Current Version:** 0.0.0.1 (Phase 0 - Scaffolding)
+**Current Version:** 0.3.0.2 (Phase 1 Complete — Execution Layer + LLM Infrastructure)
 
 See [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) for the full phase plan.
 

@@ -912,3 +912,57 @@ New `UnifiedExecutor` added:
 The Capability Parity Principle is now implemented at the execution layer: every user gets the same features regardless of hardware. Hardware determines pace, not capability. An 8 GB Mac runs the same recon pipeline as a 32 GB Kali workstation — Docker containers handle the tool execution transparently on the Mac, native subprocess on the Kali box.
 
 ---
+
+## Version 0.3.0.1 - ASCII Banner + GNU GPL v3 License
+
+**Date:** 2026-02-20
+**Phase:** 1 (Core Foundation — polish)
+**Status:** Complete
+
+### What Was Done
+- Created `kestrel/banner.py` — KESTREL block-art ASCII logo with OTS tag right-aligned to logo edge, bordered info box (version/author/license). Mirrors CTFRunner banner.py API: `get_banner()`, `print_banner()`, `get_banner_plain()`.
+- Migrated project license from MIT to GNU General Public License v3.
+  - Added `LICENSE` file (full GPL v3 text, copied from CTFRunner).
+  - Added GPL v3 file header to all 38 `kestrel/` Python source files.
+  - Updated `pyproject.toml` license field and classifier.
+  - Updated `README.md` license section with copyright notice.
+
+### Test Results
+- **After:** 268 passed, 36 skipped, 0 failed (no change — no new tests this build)
+
+### Files Changed
+- `kestrel/banner.py` — NEW
+- `LICENSE` — NEW
+- All 38 `kestrel/**/*.py` — GPL v3 headers added
+- `pyproject.toml` — license field + classifier updated
+- `README.md` — license section updated
+
+### Note on Version Strings
+Version strings in `VERSION`, `kestrel/__init__.py`, and `pyproject.toml` were inadvertently not bumped in this commit. Corrected in v0.3.0.2.
+
+---
+
+## Version 0.3.0.2 - Banner Alignment + README Logo
+
+**Date:** 2026-02-20
+**Phase:** 1 (Core Foundation — polish)
+**Status:** Complete
+
+### What Was Done
+- Fixed KESTREL ASCII art T-bar alignment: top bar `███████ ` was visually left-shifted relative to the T stem in rows 2-5. Changed to `  █████ ` (2sp+5█+sp), centering the 5-wide bar over the 2-wide stem (bar center at relative col 4 vs stem center at ~4.5 — essentially aligned).
+- Added ASCII logo block to `README.md` directly below the `# Kestrel` heading.
+- Updated `README.md` development status version (was stale at 0.0.0.1).
+- Fixed `__license__` string in `kestrel/__init__.py` (was still `"MIT"`, now `"GPL-3.0-or-later"`).
+- Properly bumped all version strings: `VERSION`, `kestrel/__init__.py`, `pyproject.toml` → 0.3.0.2.
+
+### Test Results
+- **After:** 268 passed, 36 skipped, 0 failed (no regressions)
+
+### Files Changed
+- `kestrel/banner.py` — MODIFIED (T bar row 1 + get_banner_plain row 1)
+- `README.md` — MODIFIED (logo block added, version updated)
+- `kestrel/__init__.py` — version 0.3.0.0 → 0.3.0.2, license MIT → GPL-3.0-or-later
+- `VERSION` — 0.3.0.0 → 0.3.0.2
+- `pyproject.toml` — version 0.3.0.0 → 0.3.0.2
+
+---
