@@ -22,7 +22,7 @@ FOUND_TOOLS=()
 
 echo -e "${BLUE}"
 echo "╔══════════════════════════════════════════════════════════════╗"
-echo "║              Kestrel Tool Check v0.0.0.1                ║"
+echo "║              Kestrel Tool Check v0.3.0.2                ║"
 echo "╚══════════════════════════════════════════════════════════════╝"
 echo -e "${NC}"
 
@@ -40,9 +40,9 @@ check_kali() {
         fi
     fi
     
-    echo -e "${RED}[✗] Not running on Kali Linux${NC}"
-    echo -e "${YELLOW}    Kestrel requires Kali Linux for native tool execution.${NC}"
-    echo -e "${YELLOW}    Please install Kali or run in a Kali VM.${NC}"
+    echo -e "${YELLOW}[!] Not running on Kali Linux${NC}"
+    echo -e "${YELLOW}    Native tool execution unavailable — Kestrel will use Docker (kestrel-tools).${NC}"
+    echo -e "${YELLOW}    This script checks native tools only. Docker users can skip it.${NC}"
     return 1
 }
 
@@ -200,10 +200,8 @@ print_summary() {
 # Main
 # ----------------------------------------------------------------------------
 main() {
-    # Check Kali
-    if ! check_kali; then
-        exit 1
-    fi
+    # Check Kali (warn only — non-Kali systems use Docker)
+    check_kali || true
     
     # Check Python
     if ! check_python; then

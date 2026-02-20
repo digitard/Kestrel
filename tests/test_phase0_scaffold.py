@@ -29,7 +29,6 @@ class TestProjectStructure:
             "README.md",
             "pyproject.toml",
             "toolcheck.sh",
-            "run.sh",
         ]
         
         for filename in required_files:
@@ -93,7 +92,7 @@ class TestProjectStructure:
     
     def test_scripts_are_executable(self, project_root: Path):
         """Shell scripts should be executable."""
-        scripts = ["toolcheck.sh", "run.sh"]
+        scripts = ["toolcheck.sh"]
         
         for script in scripts:
             script_path = project_root / script

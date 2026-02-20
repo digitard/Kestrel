@@ -966,3 +966,32 @@ Version strings in `VERSION`, `kestrel/__init__.py`, and `pyproject.toml` were i
 - `pyproject.toml` — version 0.3.0.0 → 0.3.0.2
 
 ---
+
+## Version 0.3.0.3 - Deprecated Content Cleanup
+
+**Date:** 2026-02-20
+**Phase:** 1 (Core Foundation — housekeeping)
+**Status:** Complete
+
+### What Was Done
+Removed stale BountyHunter-era content before it became harder to trace:
+
+- **Deleted `run.sh`** — Old bash startup script with BountyHunter box-drawing logo, wrong env var names, references to `kestrel.api.main:app` (not built yet), and `python` instead of `python3`. Superseded by `kestrel/banner.py` for branding; proper entrypoint will be created in Phase 7.
+- **Deleted `screenshot.png` and `screenshot2.png`** — Debug screenshots, not project files.
+- **Replaced `kestrel/assets/__init__.py`** — Entire file was old BountyHunter Figlet logo (`LOGO`, `LOGO_COMPACT`, `Colors`, `print_logo()` etc.). Replaced with a minimal GPL placeholder. Branding now lives in `kestrel/banner.py`.
+- **Updated `toolcheck.sh`** — Version header `v0.0.0.1` → `v0.3.0.2`. Kali check now warns instead of hard-exiting; non-Kali systems use Docker and can skip this script.
+- **Updated `tests/test_phase0_scaffold.py`** — Removed `run.sh` from `test_root_files_exist` and `test_scripts_are_executable`.
+- **Kept `kestrel/llm/anthropic.py`** — Still referenced by tests; will be properly replaced by `anthropic_backend.py` during Phase 2.
+
+### Test Results
+- **After:** 268 passed, 36 skipped, 0 failed (no regressions)
+
+### Files Changed
+- `run.sh` — DELETED
+- `screenshot.png` / `screenshot2.png` — DELETED
+- `kestrel/assets/__init__.py` — REPLACED (stub placeholder)
+- `toolcheck.sh` — MODIFIED (version + Kali check message)
+- `tests/test_phase0_scaffold.py` — MODIFIED (removed run.sh references)
+- `VERSION` / `kestrel/__init__.py` / `pyproject.toml` — 0.3.0.2 → 0.3.0.3
+
+---
