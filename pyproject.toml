@@ -7,7 +7,7 @@ name = "kestrel"
 version = "0.3.0.0"
 description = "LLM-assisted bug bounty hunting platform for Kali Linux"
 readme = "README.md"
-license = {text = "MIT"}
+license = {text = "GPL-3.0-or-later"}
 requires-python = ">=3.11"
 authors = [
     {name = "Kestrel Team"}
@@ -19,7 +19,7 @@ classifiers = [
     "Environment :: Web Environment",
     "Intended Audience :: Developers",
     "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Operating System :: POSIX :: Linux",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",

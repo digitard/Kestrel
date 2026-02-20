@@ -72,7 +72,9 @@ See [PROJECT_DOCUMENTATION.md](PROJECT_DOCUMENTATION.md) for the full phase plan
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) for details.
+GNU General Public License v3 — See [LICENSE](LICENSE) for details.
+
+Copyright (C) 2026 David Kuznicki and Kestrel Contributors
 
 ## Disclaimer
 
