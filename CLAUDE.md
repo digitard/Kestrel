@@ -76,6 +76,35 @@ Any code that requires real API credentials or native Kali/Docker tools MUST hav
 - Print clear pass/fail output
 - Include `pytest.skip(allow_module_level=True)` guard so pytest ignores them
 
+### 7. Build Evidence Capture
+
+At **every version bump**, capture build evidence to `evidence/vX.X.X.X_build_evidence.txt` before committing. The file is gitignored (local documentation only).
+
+```bash
+# Template — run at every version bump
+{
+  echo "======================================================"
+  echo "BUILD EVIDENCE — vX.X.X.X — <Phase/Description>"
+  echo "======================================================"
+  echo ""
+  echo "COMMIT INFO"
+  echo "------------------------------------------------------"
+  git log -1 --format="COMMIT: %H%nDATE:   %ad%nMESSAGE: %s%n"
+  echo ""
+  echo "------------------------------------------------------"
+  echo "TEST RESULTS"
+  echo "------------------------------------------------------"
+  python3 -m pytest tests/ -v --tb=short
+  echo ""
+  echo "------------------------------------------------------"
+  echo "FILES CHANGED"
+  echo "------------------------------------------------------"
+  git diff --name-status HEAD~1
+} > evidence/vX.X.X.X_build_evidence.txt
+```
+
+Evidence files are **not pushed to GitHub** — the user saves the `evidence/` directory locally for documentation.
+
 ---
 
 ## Platform Architecture — CRITICAL

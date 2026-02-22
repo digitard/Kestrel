@@ -39,3 +39,6 @@ kestrel_v*.zip
 
 # Kestrel credential dir (local machine only)
 ~/.kestrel/
+
+# Build evidence (local documentation only — do not push)
+evidence/

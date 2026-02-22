@@ -1257,3 +1257,31 @@ All wrappers accept `executor=` in `__init__` and implement `execute()` via
 - `VERSION` / `kestrel/__init__.py` / `pyproject.toml` — 0.4.0.1 → 0.5.0.0
 
 ---
+
+## Version 0.5.0.1 - Build Evidence System
+
+**Date:** 2026-02-21
+**Phase:** 3 (documentation / process)
+**Status:** Complete
+
+### What Was Done
+
+Added a build evidence capture system for local documentation.
+
+- **`evidence/` directory** — gitignored local directory. Contains one
+  `vX.X.X.X_build_evidence.txt` per version bump with: commit info, full
+  pytest output, and files changed. User saves locally; never pushed to GitHub.
+- **Backfilled** evidence files for all versions v0.2.1.0 → v0.5.0.0.
+- **CLAUDE.md §7** — new "Build Evidence Capture" rule with the capture
+  template. Captures evidence at every version bump going forward.
+- **`.gitignore`** — added `evidence/` exclusion.
+
+### Files Changed
+- `.gitignore` — added `evidence/` entry
+- `CLAUDE.md` — added §7 Build Evidence Capture rule + template
+- `VERSION` / `kestrel/__init__.py` / `pyproject.toml` — 0.5.0.0 → 0.5.0.1
+
+### Test Results
+- No code changes — test baseline unchanged: 437 passed, 36 skipped, 0 failed
+
+---
