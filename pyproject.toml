@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kestrel"
-version = "0.4.0.0"
+version = "0.4.0.1"
 description = "LLM-assisted bug bounty hunting platform for Kali Linux"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
