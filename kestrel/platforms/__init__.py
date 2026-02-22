@@ -21,8 +21,10 @@ Provides API clients for bug bounty platforms, program data models,
 scope validation, and local caching.
 
 Platform Clients:
-  - HackerOneClient: HackerOne Hacker API v1
-  - BugcrowdClient:  Bugcrowd REST API
+  - HackerOneClient:  HackerOne Hacker API v1 (full)
+  - BugcrowdClient:   Bugcrowd REST API (full)
+  - IntiGritiClient:  IntiGriti API (stub)
+  - YesWeHackClient:  YesWeHack API (stub)
 
 Core Components:
   - Program/ScopeEntry: Platform-agnostic data models
@@ -51,6 +53,8 @@ from .base import (
 )
 from .hackerone import HackerOneClient
 from .bugcrowd import BugcrowdClient
+from .intigriti import IntiGritiClient
+from .yeswehack import YesWeHackClient
 from .cache import ProgramCache
 from .credentials import CredentialManager, get_credentials, reset_credentials
 
@@ -76,6 +80,8 @@ __all__ = [
     # Clients
     "HackerOneClient",
     "BugcrowdClient",
+    "IntiGritiClient",
+    "YesWeHackClient",
     # Cache
     "ProgramCache",
     # Credentials

@@ -35,6 +35,8 @@ class Platform(Enum):
     """Supported bug bounty platforms."""
     HACKERONE = "hackerone"
     BUGCROWD = "bugcrowd"
+    INTIGRITI = "intigriti"
+    YESWEHACK = "yeswehack"
     MANUAL = "manual"  # Manually added programs
 
 

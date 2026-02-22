@@ -1285,3 +1285,46 @@ Added a build evidence capture system for local documentation.
 - No code changes — test baseline unchanged: 437 passed, 36 skipped, 0 failed
 
 ---
+
+## Version 0.6.0.0 - Phase 4: Platform Integration
+
+**Date:** 2026-02-21
+**Phase:** 4 (Platform Integration — expanded)
+**Status:** Complete
+
+### What Was Done
+
+Closed out Phase 4 by extending the platforms module with:
+- Two new bug bounty platform stubs (IntiGriti, YesWeHack)
+- Seven new credential types (Shodan, Censys x2, Vulners, IntiGriti, YesWeHack x2)
+- Passive recon API config sections (Shodan, Censys)
+- CVE enrichment config section (Vulners)
+- Live API validation test script
+
+### New Files
+- `kestrel/platforms/intigriti.py` — IntiGritiClient stub (Bearer token auth)
+- `kestrel/platforms/yeswehack.py` — YesWeHackClient stub (JWT two-step auth)
+- `tests/test_phase4_platforms.py` — 84 unit tests
+- `tests/test_phase4_live_api.py` — standalone live API validation script
+
+### Modified Files
+- `kestrel/platforms/credentials.py` — 7 new CredentialSpec entries, 5 new helper methods (get_intigriti_config, get_yeswehack_config, get_shodan_key, get_censys_config, get_vulners_key), expanded ENV_VARS
+- `kestrel/platforms/models.py` — Platform enum: INTIGRITI + YESWEHACK added
+- `kestrel/platforms/__init__.py` — exports IntiGritiClient, YesWeHackClient
+- `config/default.yaml` — new intigriti/yeswehack platform sections (disabled by default); new recon_apis section (shodan, censys); vulners added to cve section
+- `VERSION` / `kestrel/__init__.py` / `pyproject.toml` — 0.5.0.1 → 0.6.0.0
+
+### Test Results
+- **Before:** 437 passed, 36 skipped, 0 failed
+- **After:** 521 passed, 37 skipped, 0 failed
+- **New tests:** 84 (Phase 4 unit tests)
+
+### Architecture Notes
+- IntiGriti uses Bearer token auth (personal API token → Authorization header)
+- YesWeHack uses two-step JWT auth (POST /auth/login → JWT → Bearer)
+- Both stubs implement all BasePlatformClient abstract methods (returning empty/stub values)
+- New credential helper methods follow the same pattern as get_hackerone_config/get_bugcrowd_config
+- Shodan/Censys/Vulners are credential-only for now — client implementations in a future phase
+- All new platform sections disabled by default; credentials resolved via env vars
+
+---

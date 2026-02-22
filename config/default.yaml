@@ -38,12 +38,36 @@ platforms:
   hackerone:
     enabled: true
     api_url: "https://api.hackerone.com/v1"
-    # Credentials loaded from environment variables
-    
+    # Credentials loaded from environment variables: BH_H1_USERNAME, BH_H1_TOKEN
+
   bugcrowd:
     enabled: true
     api_url: "https://api.bugcrowd.com"
-    # Credentials loaded from environment variables
+    # Credentials loaded from environment variables: BH_BC_USERNAME, BH_BC_PASSWORD
+
+  intigriti:
+    enabled: false  # Stub — enable when full client is implemented
+    api_url: "https://api.intigriti.com"
+    # Credentials loaded from environment variables: INTIGRITI_TOKEN
+
+  yeswehack:
+    enabled: false  # Stub — enable when full client is implemented
+    api_url: "https://api.yeswehack.com"
+    # Credentials loaded from environment variables: YWH_EMAIL, YWH_PASSWORD
+
+# ============================================================================
+# Passive Recon APIs
+# ============================================================================
+recon_apis:
+  shodan:
+    enabled: false
+    api_url: "https://api.shodan.io"
+    # Credentials loaded from environment variables: SHODAN_API_KEY
+
+  censys:
+    enabled: false
+    api_url: "https://search.censys.io/api"
+    # Credentials loaded from environment variables: CENSYS_API_ID, CENSYS_API_SECRET
 
 # ============================================================================
 # LLM Configuration
@@ -99,12 +123,19 @@ cve:
     enabled: true
     api_url: "https://services.nvd.nist.gov/rest/json/cves/2.0"
     rate_limit: 5  # requests per 30 seconds without key
-    
+
+  # Vulners API (enriched CVE + exploit correlation)
+  # Use environment variable: VULNERS_API_KEY
+  vulners:
+    enabled: false
+    api_url: "https://vulners.com/api/v3"
+    # Free tier: limited requests/day; API key increases quota
+
   # Exploit-DB
   exploitdb:
     enabled: true
     # Uses local searchsploit when available
-    
+
   # Cache duration for CVE data
   cache_ttl: 86400  # 24 hours
 

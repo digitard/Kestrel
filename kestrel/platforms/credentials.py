@@ -26,7 +26,12 @@ interactively. Supports:
   - Anthropic API key
   - HackerOne API credentials (username + token)
   - Bugcrowd API credentials (token username + password)
-  - NVD API key (for future CVE correlation)
+  - IntiGriti API token
+  - YesWeHack credentials (email + password)
+  - Shodan API key (for passive recon)
+  - Censys API credentials (id + secret)
+  - Vulners API key (for CVE correlation)
+  - NVD API key (for CVE correlation)
 
 Design:
   - Credentials stored in a single YAML file outside the project
@@ -65,6 +70,13 @@ ENV_VARS = {
     "h1_token": "BH_H1_TOKEN",
     "bc_username": "BH_BC_USERNAME",
     "bc_password": "BH_BC_PASSWORD",
+    "intigriti_token": "INTIGRITI_TOKEN",
+    "ywh_email": "YWH_EMAIL",
+    "ywh_password": "YWH_PASSWORD",
+    "shodan_api_key": "SHODAN_API_KEY",
+    "censys_api_id": "CENSYS_API_ID",
+    "censys_api_secret": "CENSYS_API_SECRET",
+    "vulners_api_key": "VULNERS_API_KEY",
     "nvd_api_key": "NVD_API_KEY",
 }
 
@@ -125,6 +137,62 @@ CREDENTIAL_SPECS = [
         required=False,
         secret=True,
         group="Bugcrowd",
+    ),
+    CredentialSpec(
+        key="intigriti_token",
+        env_var="INTIGRITI_TOKEN",
+        prompt="IntiGriti API Token",
+        required=False,
+        secret=True,
+        group="IntiGriti",
+    ),
+    CredentialSpec(
+        key="ywh_email",
+        env_var="YWH_EMAIL",
+        prompt="YesWeHack Email",
+        required=False,
+        secret=False,
+        group="YesWeHack",
+    ),
+    CredentialSpec(
+        key="ywh_password",
+        env_var="YWH_PASSWORD",
+        prompt="YesWeHack Password",
+        required=False,
+        secret=True,
+        group="YesWeHack",
+    ),
+    CredentialSpec(
+        key="shodan_api_key",
+        env_var="SHODAN_API_KEY",
+        prompt="Shodan API Key (optional, for passive recon)",
+        required=False,
+        secret=True,
+        group="Recon APIs",
+    ),
+    CredentialSpec(
+        key="censys_api_id",
+        env_var="CENSYS_API_ID",
+        prompt="Censys API ID (optional, for passive recon)",
+        required=False,
+        secret=False,
+        group="Recon APIs",
+    ),
+    CredentialSpec(
+        key="censys_api_secret",
+        env_var="CENSYS_API_SECRET",
+        prompt="Censys API Secret (optional, for passive recon)",
+        required=False,
+        secret=True,
+        group="Recon APIs",
+    ),
+    CredentialSpec(
+        key="vulners_api_key",
+        env_var="VULNERS_API_KEY",
+        prompt="Vulners API Key (optional, improves CVE lookups)",
+        required=False,
+        secret=True,
+        group="CVE/NVD",
     ),
     CredentialSpec(
         key="nvd_api_key",
@@ -443,6 +511,56 @@ class CredentialManager:
             api_key=username,
             api_secret=password,
         )
+
+    def get_intigriti_config(self):
+        """
+        Get a ClientConfig for IntiGriti.
+
+        Returns:
+            ClientConfig or None if credentials not available
+        """
+        from .base import ClientConfig
+
+        token = self.get("intigriti_token")
+        if not token:
+            return None
+        return ClientConfig(api_key=token)
+
+    def get_yeswehack_config(self):
+        """
+        Get a ClientConfig for YesWeHack.
+
+        Returns:
+            ClientConfig or None if credentials not available
+        """
+        from .base import ClientConfig
+
+        email = self.get("ywh_email")
+        password = self.get("ywh_password")
+        if not email or not password:
+            return None
+        return ClientConfig(api_key=email, api_secret=password)
+
+    def get_shodan_key(self) -> Optional[str]:
+        """Get the Shodan API key."""
+        return self.get("shodan_api_key")
+
+    def get_censys_config(self) -> Optional[tuple[str, str]]:
+        """
+        Get Censys credentials as (api_id, api_secret) tuple.
+
+        Returns:
+            (api_id, api_secret) tuple or None if not configured
+        """
+        api_id = self.get("censys_api_id")
+        api_secret = self.get("censys_api_secret")
+        if not api_id or not api_secret:
+            return None
+        return (api_id, api_secret)
+
+    def get_vulners_key(self) -> Optional[str]:
+        """Get the Vulners API key."""
+        return self.get("vulners_api_key")
 
     def get_anthropic_key(self) -> Optional[str]:
         """Get the Anthropic API key."""
