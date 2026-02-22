@@ -33,6 +33,11 @@ from .nmap import NmapWrapper
 from .gobuster import GobusterWrapper
 from .nikto import NiktoWrapper
 from .sqlmap import SqlmapWrapper
+from .nuclei import NucleiWrapper
+from .subfinder import SubfinderWrapper
+from .ffuf import FfufWrapper
+from .httpx import HttpxWrapper
+from .whatweb import WhatwebWrapper
 from .registry import (
     ToolRegistry,
     ToolInfo,
@@ -104,6 +109,11 @@ __all__ = [
     "GobusterWrapper",
     "NiktoWrapper",
     "SqlmapWrapper",
+    "NucleiWrapper",
+    "SubfinderWrapper",
+    "FfufWrapper",
+    "HttpxWrapper",
+    "WhatwebWrapper",
     # Registry
     "ToolRegistry",
     "ToolInfo",

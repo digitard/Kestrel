@@ -25,7 +25,7 @@ Provides two tiers of tool access:
 
   Tier 2 - Discovered Tools: Auto-discovered Kali tools with basic
            metadata from --help output. Available for direct execution
-           through the NativeExecutor with LLM-generated commands.
+           through the UnifiedExecutor with LLM-generated commands.
 
 This enables the LLM to:
   - Know everything installed on the system
@@ -37,12 +37,14 @@ This enables the LLM to:
 import shutil
 import subprocess
 import re
-import json
 import time
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Optional, Any, TYPE_CHECKING
 from pathlib import Path
 from enum import Enum
+
+if TYPE_CHECKING:
+    from kestrel.core.executor import UnifiedExecutor
 
 from .base import ToolWrapper, ToolSchema, ToolCategory
 
@@ -476,61 +478,85 @@ KNOWN_TOOLS: dict[str, dict] = {
 #  Help Text Parser
 # ─────────────────────────────────────────────────────────────────────
 
-def _extract_help_text(tool: str, timeout: int = 5) -> Optional[str]:
+def _extract_help_text(
+    tool: str,
+    timeout: int = 5,
+    executor: Optional["UnifiedExecutor"] = None,
+) -> Optional[str]:
     """
     Try to get help text from a tool.
 
-    Attempts --help, -h, and help in order.
+    Attempts --help, -h, and help in order.  When an executor is provided
+    (e.g. in Docker mode), commands are run inside the container.
 
     Args:
         tool: Tool binary name
         timeout: Timeout in seconds
+        executor: UnifiedExecutor instance, or None to use local subprocess
 
     Returns:
         Help text or None
     """
     for flag in ["--help", "-h", "help"]:
         try:
-            result = subprocess.run(
-                [tool, flag],
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-            output = result.stdout + result.stderr
-            if len(output.strip()) > 20:
-                return output.strip()
+            if executor is not None:
+                result = executor.execute(f"{tool} {flag}", timeout=timeout)
+                output = (result.stdout + result.stderr).strip()
+            else:
+                proc = subprocess.run(
+                    [tool, flag],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+                output = (proc.stdout + proc.stderr).strip()
+
+            if len(output) > 20:
+                return output
         except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError):
+            continue
+        except Exception:
             continue
     return None
 
 
-def _extract_version(tool: str, timeout: int = 5) -> Optional[str]:
+def _extract_version(
+    tool: str,
+    timeout: int = 5,
+    executor: Optional["UnifiedExecutor"] = None,
+) -> Optional[str]:
     """
     Try to get version string from a tool.
 
     Args:
         tool: Tool binary name
         timeout: Timeout in seconds
+        executor: UnifiedExecutor instance, or None to use local subprocess
 
     Returns:
         Version string or None
     """
     for flag in ["--version", "-V", "-v", "version"]:
         try:
-            result = subprocess.run(
-                [tool, flag],
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
-            output = (result.stdout + result.stderr).strip()
+            if executor is not None:
+                result = executor.execute(f"{tool} {flag}", timeout=timeout)
+                output = (result.stdout + result.stderr).strip()
+            else:
+                proc = subprocess.run(
+                    [tool, flag],
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout,
+                )
+                output = (proc.stdout + proc.stderr).strip()
+
             if output and len(output) < 500:
-                # Extract first line as version
                 first_line = output.split("\n")[0].strip()
                 if first_line:
                     return first_line
         except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError):
+            continue
+        except Exception:
             continue
     return None
 
@@ -632,10 +658,32 @@ class ToolRegistry:
             ...
     """
 
-    def __init__(self):
+    def __init__(self, executor: Optional["UnifiedExecutor"] = None) -> None:
+        """
+        Initialise the registry.
+
+        Args:
+            executor: UnifiedExecutor for platform-aware tool availability
+                      checking (Docker vs native). When None, falls back to
+                      local ``shutil.which`` checks (backward-compatible).
+        """
         self._tools: dict[str, ToolInfo] = {}
         self._discovered: bool = False
         self._discovery_time: float = 0.0
+        self._executor: Optional["UnifiedExecutor"] = executor
+
+    def _check_tool_available(self, name: str) -> bool:
+        """Return True if *name* is available on the active execution backend."""
+        if self._executor is not None:
+            return self._executor.check_tool(name)
+        return shutil.which(name) is not None
+
+    def _get_tool_path(self, name: str) -> Optional[str]:
+        """Return path for *name* (local only; Docker paths are opaque)."""
+        if self._executor is not None:
+            # In Docker mode the binary is inside the container, not on host
+            return None if not shutil.which(name) else shutil.which(name)
+        return shutil.which(name)
 
     @property
     def discovered(self) -> bool:
@@ -673,11 +721,12 @@ class ToolRegistry:
         name = wrapper.name
         known = KNOWN_TOOLS.get(name, {})
 
+        available = self._check_tool_available(name)
         info = ToolInfo(
             name=name,
             tier=ToolTier.WRAPPED,
-            available=shutil.which(name) is not None,
-            path=shutil.which(name),
+            available=available,
+            path=self._get_tool_path(name),
             description=wrapper.description,
             category=known.get("category", wrapper.category),
             capabilities=known.get("capabilities", []),
@@ -691,7 +740,7 @@ class ToolRegistry:
 
         # Get version if available
         if info.available:
-            info.version = _extract_version(name)
+            info.version = _extract_version(name, executor=self._executor)
 
         self._tools[name] = info
         return info
@@ -720,7 +769,7 @@ class ToolRegistry:
             name=name,
             tier=ToolTier.DISCOVERED,
             available=True,
-            path=shutil.which(name),
+            path=self._get_tool_path(name),
             description=known.get("description", f"{name} security tool"),
             category=known.get("category", ToolCategory.UTILITY),
             capabilities=known.get("capabilities", []),
@@ -732,9 +781,9 @@ class ToolRegistry:
 
         # Probe for version and help if requested
         if probe_help:
-            info.version = _extract_version(name)
+            info.version = _extract_version(name, executor=self._executor)
 
-            help_text = _extract_help_text(name)
+            help_text = _extract_help_text(name, executor=self._executor)
             if help_text:
                 info.help_text = help_text[:2000]  # Cap for memory
                 info.common_flags = _parse_common_flags(help_text)
@@ -786,11 +835,11 @@ class ToolRegistry:
         for name in sorted(tools_to_check):
             # Skip if already registered as wrapped
             if name in self._tools and self._tools[name].tier == ToolTier.WRAPPED:
-                if shutil.which(name):
+                if self._check_tool_available(name):
                     found += 1
                 continue
 
-            if shutil.which(name):
+            if self._check_tool_available(name):
                 self.register_discovered_tool(name, probe_help=probe_help)
                 found += 1
             else:
@@ -1055,14 +1104,29 @@ def _initialize_registry(registry: ToolRegistry) -> None:
     from .gobuster import GobusterWrapper
     from .nikto import NiktoWrapper
     from .sqlmap import SqlmapWrapper
+    from .nuclei import NucleiWrapper
+    from .subfinder import SubfinderWrapper
+    from .ffuf import FfufWrapper
+    from .httpx import HttpxWrapper
+    from .whatweb import WhatwebWrapper
     from ..parsers import PARSERS
+    from kestrel.core.executor import UnifiedExecutor
 
-    # Register Tier 1 wrapped tools
+    # Wire a shared executor into the registry for Docker-aware discovery
+    executor = UnifiedExecutor()
+    registry._executor = executor
+
+    # Register Tier 1 wrapped tools (share the same executor)
     wrapped_tools = [
-        NmapWrapper(),
-        GobusterWrapper(),
-        NiktoWrapper(),
-        SqlmapWrapper(),
+        NmapWrapper(executor=executor),
+        GobusterWrapper(executor=executor),
+        NiktoWrapper(executor=executor),
+        SqlmapWrapper(executor=executor),
+        NucleiWrapper(executor=executor),
+        SubfinderWrapper(executor=executor),
+        FfufWrapper(executor=executor),
+        HttpxWrapper(executor=executor),
+        WhatwebWrapper(executor=executor),
     ]
 
     for wrapper in wrapped_tools:

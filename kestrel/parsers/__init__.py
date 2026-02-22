@@ -33,6 +33,11 @@ from .nmap import NmapParser
 from .gobuster import GobusterParser
 from .nikto import NiktoParser
 from .sqlmap import SqlmapParser
+from .nuclei import NucleiParser
+from .subfinder import SubfinderParser
+from .ffuf import FfufParser
+from .httpx import HttpxParser
+from .whatweb import WhatwebParser
 
 
 # Parser registry
@@ -41,6 +46,11 @@ PARSERS: dict[str, type[OutputParser]] = {
     "gobuster": GobusterParser,
     "nikto": NiktoParser,
     "sqlmap": SqlmapParser,
+    "nuclei": NucleiParser,
+    "subfinder": SubfinderParser,
+    "ffuf": FfufParser,
+    "httpx": HttpxParser,
+    "whatweb": WhatwebParser,
 }
 
 
@@ -91,6 +101,11 @@ __all__ = [
     "GobusterParser",
     "NiktoParser",
     "SqlmapParser",
+    "NucleiParser",
+    "SubfinderParser",
+    "FfufParser",
+    "HttpxParser",
+    "WhatwebParser",
     "PARSERS",
     "get_parser",
     "auto_detect_parser",

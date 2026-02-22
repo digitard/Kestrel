@@ -23,8 +23,11 @@ structured input/output handling.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, Any
+from typing import Optional, Any, TYPE_CHECKING
 from enum import Enum
+
+if TYPE_CHECKING:
+    from kestrel.core.executor import UnifiedExecutor, ExecutionResult
 
 
 class ToolCategory(Enum):
@@ -222,10 +225,65 @@ class ToolWrapper(ABC):
 class BaseToolWrapper(ToolWrapper):
     """
     Base implementation with common functionality.
-    
+
     Concrete tool wrappers should inherit from this.
     """
-    
+
+    def __init__(self, executor: Optional[Any] = None) -> None:
+        """
+        Initialize the wrapper.
+
+        Args:
+            executor: UnifiedExecutor instance. Auto-created on first execute()
+                      call if not provided.
+        """
+        self._executor = executor
+
+    def _get_executor(self) -> "UnifiedExecutor":
+        """Return stored executor, creating UnifiedExecutor if needed."""
+        if self._executor is None:
+            from kestrel.core.executor import UnifiedExecutor
+            self._executor = UnifiedExecutor()
+        return self._executor
+
+    def execute(self, request: "ToolRequest") -> "ExecutionResult":
+        """
+        Validate, build, and execute a tool request.
+
+        Args:
+            request: ToolRequest to execute
+
+        Returns:
+            ExecutionResult from UnifiedExecutor
+
+        Raises:
+            ValueError: If the request fails validation
+        """
+        from kestrel.core.executor import ExecutionResult, ExecutionStatus
+        from datetime import datetime
+
+        # Validate first
+        validation = self.validate(request)
+        if not validation.valid:
+            now = datetime.now()
+            return ExecutionResult(
+                command=f"{self.name} [invalid request]",
+                status=ExecutionStatus.FAILED,
+                error_message=f"Validation failed: {'; '.join(validation.errors)}",
+                started_at=now,
+                completed_at=now,
+                duration_seconds=0.0,
+            )
+
+        # Build command
+        command = self.build_command(request)
+
+        # Determine timeout
+        timeout = request.timeout or self.get_default_timeout()
+
+        # Execute via UnifiedExecutor
+        return self._get_executor().execute(command=command, timeout=timeout)
+
     def validate_target(self, target: str) -> ValidationResult:
         """
         Basic target validation.

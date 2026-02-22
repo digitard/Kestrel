@@ -1112,3 +1112,148 @@ context window management — all without touching the orchestrator or tools.
 - `VERSION` / `kestrel/__init__.py` / `pyproject.toml` — 0.3.0.3 → 0.4.0.0
 
 ---
+
+## Version 0.4.0.1 - Retroactive Journal Correction (v0.3.0.2 Iteration History)
+
+**Date:** 2026-02-21
+**Phase:** 2 (maintenance / journal accuracy)
+**Status:** Complete
+
+### What Was Done
+
+Corrected the v0.3.0.2 journal entry which only documented the first of three
+git commits shipped under that version tag. Three separate commits were pushed:
+
+1. **`df47992`** — Initial T bar fix + README banner + logo assets
+2. **`332b537`** — T bar width corrected from 5 wide to 6 wide (proper T shape)
+3. **`d2ca864`** — Root-cause fix: R/E/L row 1 was shifted right by 1 cell,
+   pulling the entire TREL section out of alignment with KEST.
+
+### Decision
+
+Going forward, each visual iteration will receive its own DD bump so the
+commit history maps cleanly to journal entries. Added to MEMORY.md.
+
+### Files Changed
+- `PROJECT_JOURNAL.md` — Corrected v0.3.0.2 entry with all three commits
+- `VERSION` / `kestrel/__init__.py` / `pyproject.toml` — 0.4.0.0 → 0.4.0.1
+
+---
+
+## Version 0.5.0.0 - Phase 3: Tool Layer
+
+**Date:** 2026-02-21
+**Phase:** 3 (Tool Layer)
+**Status:** Complete
+
+### What Was Done
+
+Wired the tool execution layer end-to-end: `BaseToolWrapper.execute()` now
+routes through `UnifiedExecutor` (Docker on Mac, native subprocess on Kali).
+Added five new Tier 1 wrappers covering the full recon + vuln-scan pipeline,
+plus parsers for each. Updated `ToolRegistry` to be executor-aware for
+Docker-mode tool availability checking.
+
+#### BaseToolWrapper.execute() — kestrel/tools/base.py
+Added `__init__(executor=None)` and `execute(request) → ExecutionResult`:
+1. `validate(request)` — returns FAILED ExecutionResult if invalid, no exec
+2. `build_command(request)` — builds the full CLI string
+3. `executor.execute(command, timeout=...)` — runs via UnifiedExecutor
+4. Executor lazy-created via `_get_executor()` if not injected
+
+#### ToolRegistry executor integration — kestrel/tools/registry.py
+- `ToolRegistry(executor=None)` — stores executor for platform-aware checks
+- `_check_tool_available(name)` → delegates to `executor.check_tool()` in
+  Docker mode; falls back to `shutil.which()` when no executor
+- `_get_tool_path(name)` — returns local path (None in Docker mode)
+- `register_wrapped_tool()` + `discover()` both use `_check_tool_available()`
+- `_extract_help_text()` / `_extract_version()` accept optional executor and
+  call `executor.execute()` in Docker mode, `subprocess.run()` locally
+- `_initialize_registry()` creates a shared `UnifiedExecutor` and injects
+  it into the registry before wrapping/discovery
+
+#### New Tier 1 Wrappers
+All wrappers accept `executor=` in `__init__` and implement `execute()` via
+`BaseToolWrapper`.
+
+| Wrapper | File | Category | Pipeline Role |
+|---------|------|----------|--------------|
+| `NucleiWrapper` | `kestrel/tools/nuclei.py` | VULNERABILITY | Template CVE → findings |
+| `SubfinderWrapper` | `kestrel/tools/subfinder.py` | RECON | Passive subdomain → target queue |
+| `FfufWrapper` | `kestrel/tools/ffuf.py` | ENUMERATION | Dir/param fuzz → path discovery |
+| `HttpxWrapper` | `kestrel/tools/httpx.py` | FINGERPRINT | HTTP probe → service fingerprint |
+| `WhatwebWrapper` | `kestrel/tools/whatweb.py` | FINGERPRINT | Tech fingerprint → CVE correlation |
+
+#### New Parsers
+| Parser | File | Output fed to |
+|--------|------|--------------|
+| `NucleiParser` | `kestrel/parsers/nuclei.py` | Vulnerability findings pipeline |
+| `SubfinderParser` | `kestrel/parsers/subfinder.py` | Target queue (ParsedHost) |
+| `FfufParser` | `kestrel/parsers/ffuf.py` | Discovered paths (ParsedPath) |
+| `HttpxParser` | `kestrel/parsers/httpx.py` | Service fingerprints (ParsedHost/ParsedPort) |
+| `WhatwebParser` | `kestrel/parsers/whatweb.py` | Tech stack for CVE correlation |
+
+#### Standalone Docker Integration Test Runner
+- `tests/run_docker_tool_tests.py` — Builds kestrel-tools image, starts
+  container, runs each Tier 1 tool against a real target, pipes output back,
+  verifies parsers. pytest-skipped automatically; run directly:
+  `python3 tests/run_docker_tool_tests.py [--build] [--tools X] [--target Y]`
+
+### Key Design Decisions
+
+1. **execute() returns ExecutionResult on validation failure** — Rather than
+   raising `ValueError`, invalid requests return a `FAILED` `ExecutionResult`.
+   This keeps the interface uniform for the orchestrator's error handling.
+
+2. **Executor lazy-created via `_get_executor()`** — Avoids circular imports
+   at module load time (`tools.base` → `core.executor` → `core.docker_manager`
+   → `core.executor`). The lazy pattern is safe because tools are only executed
+   at runtime, not at import time.
+
+3. **Registry executor is injected, not auto-created** — `_initialize_registry()`
+   creates one `UnifiedExecutor` and passes it to both the registry and all
+   wrappers. All tool checks during discovery share the same Docker connection.
+
+4. **Help/version probing in Docker mode** — When executor is set, `_extract_help_text()`
+   and `_extract_version()` call `executor.execute()` to probe tools inside the
+   container rather than on the host. Falls back to local `subprocess.run()` when
+   no executor provided (backward-compatible).
+
+5. **Nuclei uses -jsonl (JSONL, not JSON)** — Each line is an independent JSON
+   object. Parser iterates lines, not wrapping array. Avoids buffering entire
+   (potentially very large) nuclei output into memory.
+
+6. **WhatwebParser handles both array and single-object JSON** — `whatweb --log-json=-`
+   can emit either format depending on version. Parser normalizes to list.
+
+### Errors Encountered and Fixed
+
+1. **`patch("kestrel.tools.base.UnifiedExecutor")` fails** — `UnifiedExecutor` is
+   imported inside `_get_executor()` (lazy), not at module level, so the attribute
+   doesn't exist on the module for patching. Fixed by patching at the definition
+   site: `patch("kestrel.core.executor.UnifiedExecutor")`.
+
+### Test Results
+- **Before:** 340 passed, 36 skipped, 0 failed
+- **After:** 437 passed, 36 skipped, 0 failed (+97 new tests, 0 regressions)
+
+### Files Changed
+- `kestrel/tools/base.py` — MODIFIED (added `__init__`, `_get_executor`, `execute`)
+- `kestrel/tools/registry.py` — MODIFIED (executor-aware: `__init__`, discovery, helpers)
+- `kestrel/tools/nuclei.py` — NEW
+- `kestrel/tools/subfinder.py` — NEW
+- `kestrel/tools/ffuf.py` — NEW
+- `kestrel/tools/httpx.py` — NEW
+- `kestrel/tools/whatweb.py` — NEW
+- `kestrel/tools/__init__.py` — MODIFIED (added 5 new wrapper exports)
+- `kestrel/parsers/nuclei.py` — NEW
+- `kestrel/parsers/subfinder.py` — NEW
+- `kestrel/parsers/ffuf.py` — NEW
+- `kestrel/parsers/httpx.py` — NEW
+- `kestrel/parsers/whatweb.py` — NEW
+- `kestrel/parsers/__init__.py` — MODIFIED (added 5 new parser exports + PARSERS dict)
+- `tests/test_phase3_tools.py` — NEW (97 tests)
+- `tests/run_docker_tool_tests.py` — NEW (standalone Docker runner)
+- `VERSION` / `kestrel/__init__.py` / `pyproject.toml` — 0.4.0.1 → 0.5.0.0
+
+---

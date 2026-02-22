@@ -23,7 +23,7 @@ human-in-the-loop authorization for all exploitation attempts.
 Built following the "Intent is the New Skill" methodology.
 """
 
-__version__ = "0.4.0.1"
+__version__ = "0.5.0.0"
 __author__ = "Kestrel Team"
 __license__ = "GPL-3.0-or-later"
 
