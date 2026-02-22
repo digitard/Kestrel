@@ -948,19 +948,36 @@ Version strings in `VERSION`, `kestrel/__init__.py`, and `pyproject.toml` were i
 **Phase:** 1 (Core Foundation — polish)
 **Status:** Complete
 
-### What Was Done
-- Fixed KESTREL ASCII art T-bar alignment: top bar `███████ ` was visually left-shifted relative to the T stem in rows 2-5. Changed to `  █████ ` (2sp+5█+sp), centering the 5-wide bar over the 2-wide stem (bar center at relative col 4 vs stem center at ~4.5 — essentially aligned).
+> **Note:** This version went through three iterative commits before the final
+> alignment was correct. Per policy, each should have been its own DD bump
+> (0.3.0.2 → 0.3.0.3 → 0.3.0.4). Git history reflects three commits all
+> labeled v0.3.0.2. The journal was retroactively corrected to document the
+> final shipped state accurately. Going forward, each iteration gets its own bump.
+
+### What Was Done (final shipped state across all three commits)
+
+**Commit 1 (`df47992`) — Initial T fix + README logo:**
 - Added ASCII logo block to `README.md` directly below the `# Kestrel` heading.
 - Updated `README.md` development status version (was stale at 0.0.0.1).
-- Fixed `__license__` string in `kestrel/__init__.py` (was still `"MIT"`, now `"GPL-3.0-or-later"`).
+- Fixed `__license__` string in `kestrel/__init__.py` (was `"MIT"`, now `"GPL-3.0-or-later"`).
 - Properly bumped all version strings: `VERSION`, `kestrel/__init__.py`, `pyproject.toml` → 0.3.0.2.
+- First T-bar attempt: changed `███████ ` (7-wide, flush left) to `  █████ ` (5-wide, centered) — T still appeared too narrow.
+
+**Commit 2 (`332b537`) — T bar width corrected:**
+- T bar changed from `  █████ ` (5-wide) to ` ██████ ` (6-wide, centered at relative col 3.5), matching the stem center. Proportionally correct width.
+
+**Commit 3 (`d2ca864`) — TREL alignment root-cause fix:**
+- Discovered via Python slot analysis that R, E, L top bars (row 1) all started at relative col 0, while their bodies (rows 2–5) started at relative col 1 — 1 char left-shifted.
+- Fixed all three: R row 1 `██████  ` → ` ██████ `, E2 row 1 `███████ ` → ` ███████`, L row 1 `██` → ` ██`.
+- Final row 1: `██   ██ ███████  ██████  ██████  ██████  ███████ ██`
+- Updated `README.md` logo block to match corrected art.
 
 ### Test Results
 - **After:** 268 passed, 36 skipped, 0 failed (no regressions)
 
 ### Files Changed
-- `kestrel/banner.py` — MODIFIED (T bar row 1 + get_banner_plain row 1)
-- `README.md` — MODIFIED (logo block added, version updated)
+- `kestrel/banner.py` — MODIFIED (T bar + TREL row 1 alignment, three iterations)
+- `README.md` — MODIFIED (logo block added + corrected, version updated)
 - `kestrel/__init__.py` — version 0.3.0.0 → 0.3.0.2, license MIT → GPL-3.0-or-later
 - `VERSION` — 0.3.0.0 → 0.3.0.2
 - `pyproject.toml` — version 0.3.0.0 → 0.3.0.2
